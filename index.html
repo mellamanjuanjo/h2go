@@ -8,10 +8,21 @@
 <meta name="apple-mobile-web-app-title" content="H2Go">
 <meta name="theme-color" content="#07111f">
 <title>H2Go</title>
+
+<!-- Inline SVG icon converted to data URI for apple-touch-icon -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230d1e35'/%3E%3Cellipse cx='90' cy='105' rx='38' ry='44' fill='%237ec8f7' opacity='.18'/%3E%3Cpath d='M90 38 C90 38 58 80 58 102 a32 32 0 0 0 64 0 C122 80 90 38 90 38z' fill='%234ba3e3'/%3E%3Cpath d='M90 38 C90 38 62 78 60 100' stroke='%23b8e0ff' stroke-width='3' stroke-linecap='round' fill='none' opacity='.5'/%3E%3Cellipse cx='78' cy='96' rx='6' ry='10' fill='white' opacity='.2' transform='rotate(-20 78 96)'/%3E%3C/svg%3E">
+
+<!-- Web App Manifest inline -->
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22H2Go%22%2C%22short_name%22%3A%22H2Go%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%2307111f%22%2C%22theme_color%22%3A%22%2307111f%22%7D">
+
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body,#root{height:100%;width:100%;overflow:hidden;background:#07111f}
   body{-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+  @keyframes dropBurst{0%{transform:translate(-50%,-50%) scale(0);opacity:1}60%{transform:translate(-50%,-50%) scale(1.1);opacity:1}100%{transform:translate(-50%,-50%) scale(1.4);opacity:0}}
+  @keyframes dropletFly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0)}}
+  @keyframes celebFadeIn{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}40%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}70%{transform:translate(-50%,-50%) scale(.97)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+  @keyframes celebFadeOut{0%{opacity:1}100%{opacity:0;transform:translate(-50%,-52%) scale(.95)}}
 </style>
 </head>
 <body>
@@ -106,6 +117,9 @@ function H2Go() {
   const [toast,     setToast]     = useState('');
   const [toastVis,  setToastVis]  = useState(false);
   const [flash,     setFlash]     = useState(null);
+  const [celeb,     setCeleb]     = useState(false);
+  const [celebOut,  setCelebOut]  = useState(false);
+  const [notifNote, setNotifNote] = useState('');
   const timerRef = useRef(null);
 
   useEffect(()=>{
@@ -123,14 +137,42 @@ function H2Go() {
   const saveLogs  = useCallback((next)=>{ persist('h2go_log',JSON.stringify(next)); setLogs(next); },[persist]);
   const showToast = useCallback((msg)=>{ setToast(msg); setToastVis(true); setTimeout(()=>setToastVis(false),2400); },[]);
 
+  // Request notification permission and set up reminders
   useEffect(()=>{
     clearInterval(timerRef.current);
+    setNotifNote('');
     if(!remindOn) return;
-    timerRef.current = setInterval(()=>{
+
+    const fireReminder = () => {
       const dayTotal=(logs[todayKey()]||[]).reduce((s,e)=>s+e.ml,0);
       if(dayTotal>=goal) return;
-      if(isAllowedHour(wakeWd,wakeWe)) showToast('💧 ¡Recuerda beber agua!');
-    }, remindInt*60*1000);
+      if(!isAllowedHour(wakeWd,wakeWe)) return;
+      if(typeof Notification !== 'undefined' && Notification.permission === 'granted'){
+        new Notification('H2Go 💧', {body:'¡Es hora de beber agua!', icon:'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%22 height=%2264%22 fill=%22%230d1e35%22/%3E%3Cpath d=%27M32 8C32 8 14 30 14 42a18 18 0 0 0 36 0C50 30 32 8 32 8z%27 fill=%22%234ba3e3%22/%3E%3C/svg%3E'});
+      } else {
+        showToast('💧 ¡Recuerda beber agua!');
+      }
+    };
+
+    if(typeof Notification === 'undefined'){
+      setNotifNote('Tu navegador no soporta notificaciones. Los avisos aparecerán dentro de la app mientras esté abierta.');
+      timerRef.current = setInterval(fireReminder, remindInt*60*1000);
+    } else if(Notification.permission === 'granted'){
+      setNotifNote('✓ Notificaciones activadas');
+      timerRef.current = setInterval(fireReminder, remindInt*60*1000);
+    } else if(Notification.permission === 'denied'){
+      setNotifNote('Las notificaciones están bloqueadas en este dispositivo. Ve a Ajustes → Safari → Notificaciones para activarlas.');
+    } else {
+      Notification.requestPermission().then(p=>{
+        if(p==='granted'){
+          setNotifNote('✓ Notificaciones activadas');
+          timerRef.current = setInterval(fireReminder, remindInt*60*1000);
+        } else {
+          setNotifNote('Permiso denegado. Los avisos se mostrarán dentro de la app mientras esté abierta.');
+          timerRef.current = setInterval(fireReminder, remindInt*60*1000);
+        }
+      });
+    }
     return ()=>clearInterval(timerRef.current);
   },[remindOn,remindInt,wakeWd,wakeWe,goal,logs,showToast]);
 
@@ -142,7 +184,13 @@ function H2Go() {
     setFlash(idx); setTimeout(()=>setFlash(null),320);
     const total=next[k].reduce((s,e)=>s+e.ml,0);
     showToast(`+${ml} ml — Total: ${total} ml`);
-    if(total>=goal&&total-ml<goal) setTimeout(()=>showToast('🎉 ¡Objetivo del día cumplido!'),900);
+    if(total>=goal&&total-ml<goal){
+      setTimeout(()=>{
+        setCelebOut(false);
+        setCeleb(true);
+        setTimeout(()=>{ setCelebOut(true); setTimeout(()=>setCeleb(false),600); }, 3200);
+      }, 400);
+    }
   },[logs,goal,saveLogs,showToast]);
 
   const deleteEntry=useCallback((i)=>{
@@ -408,6 +456,12 @@ function H2Go() {
                 Los recordatorios se silencian entre las <strong style={{color:C.accent2}}>22:00</strong> y tu hora de despertar, y también en cuanto <strong style={{color:C.accent2}}>alcanzas el objetivo del día</strong>.
               </div>
             )}
+            {remindOn&&notifNote&&(
+              <div style={{fontSize:10,lineHeight:1.6,background:C.bg2,border:`1px solid ${notifNote.startsWith('✓')?'#2a5a3a':'#4a3a20'}`,borderRadius:12,padding:'11px 14px',
+                color:notifNote.startsWith('✓')?C.green:'#c8a84a'}}>
+                {notifNote}
+              </div>
+            )}
 
             <button onClick={()=>{ if(window.confirm('¿Reiniciar los datos de hoy?')){ const next={...logs}; delete next[todayKey()]; saveLogs(next); showToast('Datos de hoy reiniciados'); } }}
               style={{width:'100%',background:'none',border:'1px solid #4a2020',borderRadius:12,color:'#c07070',padding:13,fontSize:12,letterSpacing:'.08em',cursor:'pointer',fontFamily:'inherit'}}>
@@ -432,7 +486,49 @@ function H2Go() {
         </div>
       )}
 
-      <div style={{position:'fixed',bottom:20,left:'50%',transform:`translateX(-50%) translateY(${toastVis?0:80}px)`,background:C.accent,color:C.bg,fontSize:12,fontWeight:500,letterSpacing:'.06em',padding:'9px 18px',borderRadius:20,zIndex:200,opacity:toastVis?1:0,transition:'transform .3s,opacity .3s',whiteSpace:'nowrap',pointerEvents:'none'}}>
+      {/* CELEBRACIÓN — objetivo alcanzado */}
+      {celeb&&(
+        <div style={{position:'fixed',inset:0,zIndex:300,pointerEvents:'none'}}>
+          {/* Gotas explosivas */}
+          {Array.from({length:18},(_,i)=>{
+            const angle=(i/18)*360; const dist=80+Math.random()*60;
+            const tx=Math.cos(angle*Math.PI/180)*dist; const ty=Math.sin(angle*Math.PI/180)*dist;
+            const size=6+Math.random()*10; const delay=Math.random()*0.3;
+            const colors=['#4ba3e3','#7ec8f7','#b8e0ff','#3ab87a','#c5e8fc'];
+            return(<div key={i} style={{position:'absolute',left:'50%',top:'50%',
+              width:size,height:size*1.3,borderRadius:'50% 50% 50% 50% / 60% 60% 40% 40%',
+              background:colors[i%colors.length],
+              '--tx':tx+'px','--ty':ty+'px',
+              animation:`dropletFly 1s ${delay}s cubic-bezier(.2,0,.8,1) forwards`}}/>);
+          })}
+          {/* Anillo expansivo */}
+          <div style={{position:'absolute',left:'50%',top:'50%',width:160,height:160,borderRadius:'50%',
+            border:'3px solid #7ec8f7',transform:'translate(-50%,-50%)',
+            animation:'dropBurst 1s ease-out forwards',opacity:0.6}}/>
+          {/* Tarjeta central */}
+          <div style={{position:'absolute',left:'50%',top:'50%',
+            animation:celebOut?'celebFadeOut .6s ease forwards':'celebFadeIn .5s ease forwards',
+            background:'linear-gradient(135deg,#0d1e35,#112240)',
+            border:'1px solid #4ba3e3',borderRadius:28,padding:'32px 40px',textAlign:'center',
+            boxShadow:'0 0 60px rgba(75,163,227,.3), 0 20px 60px rgba(0,0,0,.5)'}}>
+            {/* Gota SVG grande */}
+            <svg width="64" height="80" viewBox="0 0 64 80" style={{margin:'0 auto 16px',display:'block',filter:'drop-shadow(0 0 12px rgba(75,163,227,.6))'}}>
+              <path d="M32 4C32 4 6 36 6 52a26 26 0 0 0 52 0C58 36 32 4 32 4z" fill="#4ba3e3"/>
+              <path d="M32 4C32 4 8 34 7 50" stroke="#b8e0ff" strokeWidth="3" strokeLinecap="round" fill="none" opacity=".5"/>
+              <ellipse cx="22" cy="46" rx="6" ry="10" fill="white" opacity=".2" transform="rotate(-20 22 46)"/>
+            </svg>
+            <div style={{fontFamily:"Georgia,serif",fontSize:22,color:'#e8f4ff',letterSpacing:'-.01em',marginBottom:6}}>
+              ¡Reto conseguido!
+            </div>
+            <div style={{fontSize:12,color:'#7ec8f7',letterSpacing:'.1em',textTransform:'uppercase'}}>
+              Objetivo del día cumplido
+            </div>
+            <div style={{fontSize:28,marginTop:14}}>💧</div>
+          </div>
+        </div>
+      )}
+
+      <div style={{position:'fixed',bottom:20,left:'50%',transform:`translateX(-50%) translateY(${toastVis?0:80}px)`,background:'#4ba3e3',color:'#07111f',fontSize:12,fontWeight:500,letterSpacing:'.06em',padding:'9px 18px',borderRadius:20,zIndex:200,opacity:toastVis?1:0,transition:'transform .3s,opacity .3s',whiteSpace:'nowrap',pointerEvents:'none'}}>
         {toast}
       </div>
     </div>

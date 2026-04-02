@@ -8,96 +8,48 @@
 <meta name="apple-mobile-web-app-title" content="H2Go">
 <meta name="theme-color" content="#07111f">
 <title>H2Go</title>
-
-<!-- App icons — upload these PNG files to GitHub alongside index.html -->
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
-
 <style>
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  html,body,#root{height:100%;width:100%;overflow:hidden;background:#07111f}
-  body{-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
-  @keyframes dropBurst{0%{transform:translate(-50%,-50%) scale(0);opacity:1}60%{transform:translate(-50%,-50%) scale(1.1);opacity:1}100%{transform:translate(-50%,-50%) scale(1.4);opacity:0}}
-  @keyframes dropletFly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0)}}
-  @keyframes celebFadeIn{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}40%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}70%{transform:translate(-50%,-50%) scale(.97)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
-  @keyframes celebFadeOut{0%{opacity:1}100%{opacity:0;transform:translate(-50%,-52%) scale(.95)}}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body,#root{height:100%;width:100%;overflow:hidden;background:#07111f}
+body{-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+
+@keyframes ringPop {
+  0%  { transform:translate(-50%,-50%) scale(0); opacity:.8 }
+  70% { transform:translate(-50%,-50%) scale(1.1); opacity:.4 }
+  100%{ transform:translate(-50%,-50%) scale(1.5); opacity:0 }
+}
+@keyframes cardIn {
+  0%  { opacity:0; transform:translate(-50%,-50%) scale(.6) }
+  60% { opacity:1; transform:translate(-50%,-50%) scale(1.04) }
+  100%{ opacity:1; transform:translate(-50%,-50%) scale(1) }
+}
+@keyframes cardOut {
+  0%  { opacity:1; transform:translate(-50%,-50%) scale(1) }
+  100%{ opacity:0; transform:translate(-50%,-50%) scale(.9) }
+}
+@keyframes flyDrop {
+  0%  { opacity:1; transform:translate(0,0) scale(1) }
+  100%{ opacity:0; transform:var(--fly); scale:0 }
+}
 </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-
 <script type="text/babel">
-const { useState, useEffect, useCallback, useRef } = React;
+const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
+// ── Constants ──────────────────────────────────────────────────────────────
 const DAYS   = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const CIRC = 502.65;
-
-function todayKey() { return new Date().toISOString().slice(0,10); }
-function dateKey(d) { return d.toISOString().slice(0,10); }
-function fmtDate(d) { return `${DAYS[d.getDay()]}, ${d.getDate()} de ${MONTHS[d.getMonth()]}`; }
-
-function getWeekDays() {
-  const now = new Date();
-  const dow  = now.getDay();
-  const diff = dow === 0 ? -6 : 1 - dow;
-  const mon  = new Date(now);
-  mon.setDate(now.getDate() + diff);
-  return Array.from({length:7}, (_,i) => { const d = new Date(mon); d.setDate(mon.getDate()+i); return d; });
-}
-
-function getMonthDays(year, month) {
-  const days = [];
-  const d = new Date(year, month, 1);
-  while(d.getMonth() === month) { days.push(new Date(d)); d.setDate(d.getDate()+1); }
-  return days;
-}
-
-function isAllowedHour(wakeWd, wakeWe) {
-  const now = new Date();
-  const h   = now.getHours() + now.getMinutes()/60;
-  const dow = now.getDay();
-  const wakeHour = (dow===0||dow===6) ? wakeWe : wakeWd;
-  return h >= wakeHour && h < 22;
-}
-
-const VasoSVG = () => (
-  <svg viewBox="0 981 393 580" style={{width:'100%',height:'100%'}} xmlns="http://www.w3.org/2000/svg">
-    <path fill="#C5E8FC" d="M27.7,981.6h337.1l-25.3,523.2c-0.5,9.4-4.8,17.6-11.3,23.1c-5.2,4.4-11.9,7-19.1,7H83.4c-7.2,0-13.9-2.6-19.1-7c-6.5-5.5-10.9-13.7-11.3-23.1L27.7,981.6z"/>
-    <path opacity=".5" fill="#FFFFFF" d="M302.4,1539.6c-0.1,5.6-1,10.7-2.5,15.3c6.2-0.3,11.8-3,16.3-7.3c6-5.8,9.9-14.5,10.3-24.4l28.2-679.3H322L302.4,1539.6z"/>
-    <path opacity=".7" fill="#C5E8FC" d="M96.4,843.8H37.7l28.2,679.3c0.4,9.9,4.4,18.6,10.3,24.4c4.8,4.6,10.8,7.4,17.4,7.4h25c-1.4-4.6-2.3-9.8-2.5-15.3L96.4,843.8z"/>
-    <path fill="#7DC1E7" d="M72,1559.4c-8.6,0-17.1-3-23.8-8.4c-8.4-6.8-13.6-16.9-14.1-27.7L0,844c-0.1-1.2,0.4-2.4,1.2-3.3c0.9-0.9,2-1.4,3.3-1.4h383.4c1.2,0,2.4,0.5,3.3,1.4c0.9,0.9,1.3,2.1,1.2,3.3l-34.1,679.3c-0.5,10.8-5.7,20.9-14.1,27.7c-6.7,5.4-15.2,8.4-23.8,8.4H72z M383.2,848.3H9.3l33.8,674.5c0.4,8.2,4.4,16,10.8,21.2c5.1,4.1,11.6,6.4,18.2,6.4h248.3c6.6,0,13-2.3,18.2-6.4c6.4-5.2,10.4-12.9,10.8-21.2L383.2,848.3z"/>
-  </svg>
-);
-
-const BotellaSVG = () => (
-  <svg viewBox="1125 395 415 1175" style={{width:'100%',height:'100%'}} xmlns="http://www.w3.org/2000/svg">
-    <path fill="#81BBEA" d="M1254.6,1560.9c-44.1,0-75.1-3.6-93-21.6c-23.2-23.2-23.1-66.1-22.9-151.4c0-7.1,0-14.6,0-22.3c-9.1-9.3-13.9-26.1-13-45.6c0.7-13,4.4-29,13-37.1l0-68.8c-9.1-9.4-13.9-26.1-13-45.6c0.7-13,4.4-29,13-37.1l0-68.8c-9.1-9.4-13.9-26.1-13-45.6c0.7-13,4.4-29,13-37.1l0-68.8c-9.1-9.3-13.9-26.1-13-45.6c0.7-13,4.4-28.9,12.9-37c-2-80.6,13.3-141.4,48.3-190.9c6.1-8.7,12.8-17.1,19.3-25.2c9.4-11.8,19.1-24,27-37c12.5-20.7,15-70.9,15-71.5c0.2-3.2,2.8-5.7,6-5.7h146.7c3.2,0,5.9,2.5,6,5.7c0,0.5,2.5,50.8,15,71.5c7.8,13,17.6,25.2,27,37c6.5,8.1,13.2,16.5,19.3,25.2c35,49.5,50.4,110.3,48.3,190.9c8.5,8.1,12.3,24,12.9,37c1,19.5-3.8,36.2-13,45.6l0,68.8c8.6,8.1,12.3,24,13,37.1c1,19.5-3.8,36.2-13,45.6l0,68.8c8.6,8.1,12.3,24,13,37.1c1,19.5-3.8,36.2-13,45.6l0,68.8c8.6,8.1,12.3,24,13,37.1c1,19.5-3.8,36.2-13,45.6c0,7.7,0,15.2,0,22.3c0.2,85.3,0.3,128.2-22.9,151.4c-18,18-48.9,21.6-93,21.6L1254.6,1560.9z"/>
-    <path fill="#C5E8FC" d="M1205.7,646.6h243.8c34.6,54.6,44.3,113.9,42.3,185c14.2,10.7,17.2,61.2,0,77.2l0,74.2c14.2,10.7,17.2,61.2,0,77.2l0,74.2c14.2,10.7,17.2,61.2,0,77.2l0,74.2c14.2,10.7,17.2,61.2,0,77.2c0,164.9,5.9,171.8-98.7,171.8H1262c-104.5,0-98.7-6.9-98.7-171.8c-17.1-16-14.1-66.5,0-77.2l0-74.2c-17.1-16-14.1-66.5,0-77.2l0-74.2c-17.1-16-14.1-66.5,0-77.2l0-74.2c-17.1-16-14.1-66.5,0-77.2C1161.4,760.5,1171.1,701.2,1205.7,646.6z"/>
-    <path fill="#1173BC" d="M1411.1,494.7c4.9-25.7,5.1-51.6,1.7-77.8c-0.4-2.9-1.6-5.5-3.5-7.6c-2.3-2.5-5.5-4.3-9.1-4.6c-48.6-4.7-97.2-4.7-145.6,0c-3.2,0.3-6.1,1.7-8.2,3.8s-3.7,4.9-4.2,8c-4.1,26.1-3.4,52.1,1.9,78.2L1411.1,494.7z"/>
-    <path fill="#81BBEA" d="M1422.6,504.6c0-5.4-4.4-9.8-9.8-9.8h-170.2c-5.4,0-9.8,4.4-9.8,9.8s4.4,9.8,9.8,9.8h170.2C1418.2,514.4,1422.6,510,1422.6,504.6z"/>
-    <path opacity=".7" fill="#FFFFFF" d="M1384.3,811.1c0-42.5-5-121.5-12.8-153.8c-12.8-52.9,2.7-79.2,25.8-49.3c34.5,44.7,69.1,110.3,65.9,202.3C1462.4,832.1,1384.3,835.3,1384.3,811.1z"/>
-  </svg>
-);
-
-const BotellonSVG = () => (
-  <svg viewBox="2280 0 495 1565" style={{width:'100%',height:'100%'}} xmlns="http://www.w3.org/2000/svg">
-    <path fill="#C5E8FC" d="M2402.6,323c-21.1,52.2-46.4,118.6-66.3,188.5c-24.2,84.9-36.4,161.5-36.4,228v710.4c0,75.9,41.1,84,58.8,84c21.2,0,59.9-18.1,79.3-29.5l13.1-7.7l11.4,10.1c20.4,18,40.5,27.1,59.6,27.1c19.1,0,39.2-9.1,59.6-27.1l11.4-10.1l13.1,7.7c19.4,11.4,58.1,29.5,79.3,29.5c17.7,0,58.8-8.2,58.8-84V739.5c0-140.4-53.8-294.8-102.8-416.5L2402.6,323z"/>
-    <path fill="#81BBEA" d="M2432.6,166c0,13.1-15.4,50.3-34.8,97.4c-46.7,113.2-124.9,302.7-124.9,476v710.4c0,81.9,44.4,111.1,85.9,111.1c32.5,0,79.8-25.7,90.8-31.9c17.9,20,44.4,31.9,72.8,31.9c28.4,0,54.9-11.9,72.8-31.9c11,6.2,58.2,31.9,90.8,31.9c41.5,0,85.9-29.2,85.9-111.1V739.5c0-173.3-78.2-362.8-124.9-476c-19.5-47.1-34.8-84.3-34.8-97.4v-55.5c0-3.3-2.7-6-6-6h-167.3c-3.3,0-6,2.7-6,6L2432.6,166z"/>
-    <path fill="#1173BC" d="M2435.7,7.8c-2.4,2.2-4,5.2-4.5,8.6c-4.4,27.9-3.7,55.8,2.1,83.6h178.6c5.2-27.5,5.5-55.2,1.8-83.2c-0.4-3.1-1.8-5.9-3.7-8.1c-2.4-2.7-5.9-4.6-9.7-4.9c-52-5-103.9-5-155.7,0C2441.1,4.1,2438,5.6,2435.7,7.8z"/>
-    <path fill="#81BBEA" d="M2421,110.6c0,5.8,4.7,10.5,10.5,10.5h182.1c5.8,0,10.5-4.7,10.5-10.5s-4.7-10.5-10.5-10.5h-182.1C2425.7,100,2421,104.7,2421,110.6z"/>
-    <path opacity=".7" fill="#FFFFFF" d="M2640.3,375.3c-23.7-67.2-36.3-54.4-16.9,12.9c32.3,112.2,75.2,254.7,75.2,389.2v696.3c0,38.8,30.7,40.1,30.7-1.2V776.1C2729.3,637,2680.4,489.1,2640.3,375.3z"/>
-    <path opacity=".7" fill="#C5E8FC" d="M2404,382.8c-40.8,113.6-89,261.7-89,400.9v696.3c0,41.3,76.4,38.8,76.4,0V783.6c0-134.5,42.1-277.2,75.2-389.2c30.3-102.3,30.3-285.5,30.3-285.5h-26.7C2470.3,226.9,2449.7,255.7,2404,382.8z"/>
-  </svg>
-);
-
-const REMINDER_MSGS = [
+const MS     = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const CIRC   = 502.65;
+const MSGS   = [
   '💧 No olvides hidratarte',
   '💧 Es hora de pegar un trago',
   '💧 Tu cuerpo te pide agua',
@@ -109,12 +61,78 @@ const REMINDER_MSGS = [
   '💧 Pequeño sorbo, gran beneficio',
   '💧 Tu mente funciona mejor hidratada',
 ];
-function randomReminder() { return REMINDER_MSGS[Math.floor(Math.random()*REMINDER_MSGS.length)]; }
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const todayKey  = () => new Date().toISOString().slice(0,10);
+const dateKey   = d  => d.toISOString().slice(0,10);
+const fmtDate   = d  => `${DAYS[d.getDay()]}, ${d.getDate()} de ${MONTHS[d.getMonth()]}`;
+const randMsg   = () => MSGS[Math.floor(Math.random()*MSGS.length)];
+
+function getWeekDays() {
+  const now=new Date(), dow=now.getDay(), diff=dow===0?-6:1-dow;
+  const mon=new Date(now); mon.setDate(now.getDate()+diff);
+  return Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+}
+function getMonthDays(y,m) {
+  const days=[]; const d=new Date(y,m,1);
+  while(d.getMonth()===m){ days.push(new Date(d)); d.setDate(d.getDate()+1); }
+  return days;
+}
+function isAllowedHour(wd,we) {
+  const now=new Date(), h=now.getHours()+now.getMinutes()/60, dow=now.getDay();
+  return h>=((dow===0||dow===6)?we:wd) && h<22;
+}
+
+// ── SVG Vessels ────────────────────────────────────────────────────────────
+const VasoSVG = () => (
+  <svg viewBox="0 981 393 580" style={{width:'100%',height:'100%'}} xmlns="http://www.w3.org/2000/svg">
+    <path fill="#C5E8FC" d="M27.7,981.6h337.1l-25.3,523.2c-0.5,9.4-4.8,17.6-11.3,23.1c-5.2,4.4-11.9,7-19.1,7H83.4c-7.2,0-13.9-2.6-19.1-7c-6.5-5.5-10.9-13.7-11.3-23.1L27.7,981.6z"/>
+    <path opacity=".5" fill="#FFF" d="M302.4,1539.6c-0.1,5.6-1,10.7-2.5,15.3c6.2-0.3,11.8-3,16.3-7.3c6-5.8,9.9-14.5,10.3-24.4l28.2-679.3H322L302.4,1539.6z"/>
+    <path opacity=".7" fill="#C5E8FC" d="M96.4,843.8H37.7l28.2,679.3c0.4,9.9,4.4,18.6,10.3,24.4c4.8,4.6,10.8,7.4,17.4,7.4h25c-1.4-4.6-2.3-9.8-2.5-15.3L96.4,843.8z"/>
+    <path fill="#7DC1E7" d="M72,1559.4c-8.6,0-17.1-3-23.8-8.4c-8.4-6.8-13.6-16.9-14.1-27.7L0,844c-0.1-1.2,0.4-2.4,1.2-3.3c0.9-0.9,2-1.4,3.3-1.4h383.4c1.2,0,2.4,0.5,3.3,1.4c0.9,0.9,1.3,2.1,1.2,3.3l-34.1,679.3c-0.5,10.8-5.7,20.9-14.1,27.7c-6.7,5.4-15.2,8.4-23.8,8.4H72z M383.2,848.3H9.3l33.8,674.5c0.4,8.2,4.4,16,10.8,21.2c5.1,4.1,11.6,6.4,18.2,6.4h248.3c6.6,0,13-2.3,18.2-6.4c6.4-5.2,10.4-12.9,10.8-21.2L383.2,848.3z"/>
+  </svg>
+);
+const BotellaSVG = () => (
+  <svg viewBox="1125 395 415 1175" style={{width:'100%',height:'100%'}} xmlns="http://www.w3.org/2000/svg">
+    <path fill="#81BBEA" d="M1254.6,1560.9c-44.1,0-75.1-3.6-93-21.6c-23.2-23.2-23.1-66.1-22.9-151.4c0-7.1,0-14.6,0-22.3c-9.1-9.3-13.9-26.1-13-45.6c0.7-13,4.4-29,13-37.1l0-68.8c-9.1-9.4-13.9-26.1-13-45.6c0.7-13,4.4-29,13-37.1l0-68.8c-9.1-9.4-13.9-26.1-13-45.6c0.7-13,4.4-29,13-37.1l0-68.8c-9.1-9.3-13.9-26.1-13-45.6c0.7-13,4.4-28.9,12.9-37c-2-80.6,13.3-141.4,48.3-190.9c6.1-8.7,12.8-17.1,19.3-25.2c9.4-11.8,19.1-24,27-37c12.5-20.7,15-70.9,15-71.5c0.2-3.2,2.8-5.7,6-5.7h146.7c3.2,0,5.9,2.5,6,5.7c0,0.5,2.5,50.8,15,71.5c7.8,13,17.6,25.2,27,37c6.5,8.1,13.2,16.5,19.3,25.2c35,49.5,50.4,110.3,48.3,190.9c8.5,8.1,12.3,24,12.9,37c1,19.5-3.8,36.2-13,45.6l0,68.8c8.6,8.1,12.3,24,13,37.1c1,19.5-3.8,36.2-13,45.6l0,68.8c8.6,8.1,12.3,24,13,37.1c1,19.5-3.8,36.2-13,45.6l0,68.8c8.6,8.1,12.3,24,13,37.1c1,19.5-3.8,36.2-13,45.6c0,7.7,0,15.2,0,22.3c0.2,85.3,0.3,128.2-22.9,151.4c-18,18-48.9,21.6-93,21.6L1254.6,1560.9z"/>
+    <path fill="#C5E8FC" d="M1205.7,646.6h243.8c34.6,54.6,44.3,113.9,42.3,185c14.2,10.7,17.2,61.2,0,77.2l0,74.2c14.2,10.7,17.2,61.2,0,77.2l0,74.2c14.2,10.7,17.2,61.2,0,77.2l0,74.2c14.2,10.7,17.2,61.2,0,77.2c0,164.9,5.9,171.8-98.7,171.8H1262c-104.5,0-98.7-6.9-98.7-171.8c-17.1-16-14.1-66.5,0-77.2l0-74.2c-17.1-16-14.1-66.5,0-77.2l0-74.2c-17.1-16-14.1-66.5,0-77.2l0-74.2c-17.1-16-14.1-66.5,0-77.2C1161.4,760.5,1171.1,701.2,1205.7,646.6z"/>
+    <path fill="#1173BC" d="M1411.1,494.7c4.9-25.7,5.1-51.6,1.7-77.8c-0.4-2.9-1.6-5.5-3.5-7.6c-2.3-2.5-5.5-4.3-9.1-4.6c-48.6-4.7-97.2-4.7-145.6,0c-3.2,0.3-6.1,1.7-8.2,3.8s-3.7,4.9-4.2,8c-4.1,26.1-3.4,52.1,1.9,78.2L1411.1,494.7z"/>
+    <path fill="#81BBEA" d="M1422.6,504.6c0-5.4-4.4-9.8-9.8-9.8h-170.2c-5.4,0-9.8,4.4-9.8,9.8s4.4,9.8,9.8,9.8h170.2C1418.2,514.4,1422.6,510,1422.6,504.6z"/>
+    <path opacity=".7" fill="#FFF" d="M1384.3,811.1c0-42.5-5-121.5-12.8-153.8c-12.8-52.9,2.7-79.2,25.8-49.3c34.5,44.7,69.1,110.3,65.9,202.3C1462.4,832.1,1384.3,835.3,1384.3,811.1z"/>
+  </svg>
+);
+const BotellonSVG = () => (
+  <svg viewBox="2280 0 495 1565" style={{width:'100%',height:'100%'}} xmlns="http://www.w3.org/2000/svg">
+    <path fill="#C5E8FC" d="M2402.6,323c-21.1,52.2-46.4,118.6-66.3,188.5c-24.2,84.9-36.4,161.5-36.4,228v710.4c0,75.9,41.1,84,58.8,84c21.2,0,59.9-18.1,79.3-29.5l13.1-7.7l11.4,10.1c20.4,18,40.5,27.1,59.6,27.1c19.1,0,39.2-9.1,59.6-27.1l11.4-10.1l13.1,7.7c19.4,11.4,58.1,29.5,79.3,29.5c17.7,0,58.8-8.2,58.8-84V739.5c0-140.4-53.8-294.8-102.8-416.5L2402.6,323z"/>
+    <path fill="#81BBEA" d="M2432.6,166c0,13.1-15.4,50.3-34.8,97.4c-46.7,113.2-124.9,302.7-124.9,476v710.4c0,81.9,44.4,111.1,85.9,111.1c32.5,0,79.8-25.7,90.8-31.9c17.9,20,44.4,31.9,72.8,31.9c28.4,0,54.9-11.9,72.8-31.9c11,6.2,58.2,31.9,90.8,31.9c41.5,0,85.9-29.2,85.9-111.1V739.5c0-173.3-78.2-362.8-124.9-476c-19.5-47.1-34.8-84.3-34.8-97.4v-55.5c0-3.3-2.7-6-6-6h-167.3c-3.3,0-6,2.7-6,6L2432.6,166z"/>
+    <path fill="#1173BC" d="M2435.7,7.8c-2.4,2.2-4,5.2-4.5,8.6c-4.4,27.9-3.7,55.8,2.1,83.6h178.6c5.2-27.5,5.5-55.2,1.8-83.2c-0.4-3.1-1.8-5.9-3.7-8.1c-2.4-2.7-5.9-4.6-9.7-4.9c-52-5-103.9-5-155.7,0C2441.1,4.1,2438,5.6,2435.7,7.8z"/>
+    <path fill="#81BBEA" d="M2421,110.6c0,5.8,4.7,10.5,10.5,10.5h182.1c5.8,0,10.5-4.7,10.5-10.5s-4.7-10.5-10.5-10.5h-182.1C2425.7,100,2421,104.7,2421,110.6z"/>
+    <path opacity=".7" fill="#FFF" d="M2640.3,375.3c-23.7-67.2-36.3-54.4-16.9,12.9c32.3,112.2,75.2,254.7,75.2,389.2v696.3c0,38.8,30.7,40.1,30.7-1.2V776.1C2729.3,637,2680.4,489.1,2640.3,375.3z"/>
+    <path opacity=".7" fill="#C5E8FC" d="M2404,382.8c-40.8,113.6-89,261.7-89,400.9v696.3c0,41.3,76.4,38.8,76.4,0V783.6c0-134.5,42.1-277.2,75.2-389.2c30.3-102.3,30.3-285.5,30.3-285.5h-26.7C2470.3,226.9,2449.7,255.7,2404,382.8z"/>
+  </svg>
+);
+
+const VESSELS = [
   { ml:250,  label:'vaso',    Comp:VasoSVG,    w:38, h:50 },
   { ml:500,  label:'botella', Comp:BotellaSVG, w:50, h:68 },
   { ml:1000, label:'1 litro', Comp:BotellonSVG,w:60, h:84 },
 ];
 
+// ── Celebration particles — computed once per celebration ──────────────────
+function makeDots() {
+  return Array.from({length:16}, (_,i) => {
+    const angle = (i/16)*360;
+    const dist  = 70 + Math.random()*70;
+    const tx    = Math.round(Math.cos(angle*Math.PI/180)*dist);
+    const ty    = Math.round(Math.sin(angle*Math.PI/180)*dist);
+    const s     = 6 + Math.floor(Math.random()*9);
+    const delay = (Math.random()*0.25).toFixed(2);
+    const cols  = ['#4ba3e3','#7ec8f7','#b8e0ff','#3ab87a','#c5e8fc'];
+    return { tx, ty, s, delay, col: cols[i%cols.length] };
+  });
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
 function H2Go() {
   const [tab,       setTab]       = useState('today');
   const [histMode,  setHistMode]  = useState('week');
@@ -130,63 +148,76 @@ function H2Go() {
   const [flash,     setFlash]     = useState(null);
   const [celeb,     setCeleb]     = useState(false);
   const [celebOut,  setCelebOut]  = useState(false);
+  const [celebDots, setCelebDots] = useState([]);
   const [notifNote, setNotifNote] = useState('');
   const timerRef = useRef(null);
 
+  // Load persisted settings
   useEffect(()=>{
-    try{
+    try {
       const l=localStorage.getItem('h2go_log'); if(l) setLogs(JSON.parse(l));
       const g=localStorage.getItem('h2go_goal'); if(g) setGoal(parseInt(g));
       setRemindOn(localStorage.getItem('h2go_remind')==='1');
       const ri=localStorage.getItem('h2go_interval'); if(ri) setRemindInt(parseInt(ri));
       const ww=localStorage.getItem('h2go_wakewd'); if(ww) setWakeWd(parseInt(ww));
       const we=localStorage.getItem('h2go_wakewe'); if(we) setWakeWe(parseInt(we));
-    }catch(e){}
+    } catch(e){}
   },[]);
 
-  const persist   = useCallback((k,v)=>{ try{localStorage.setItem(k,String(v));}catch(e){} },[]);
-  const saveLogs  = useCallback((next)=>{ persist('h2go_log',JSON.stringify(next)); setLogs(next); },[persist]);
-  const showToast = useCallback((msg)=>{ setToast(msg); setToastVis(true); setTimeout(()=>setToastVis(false),2400); },[]);
+  const persist  = useCallback((k,v)=>{ try{localStorage.setItem(k,String(v));}catch(e){} },[]);
+  const saveLogs = useCallback((next)=>{ persist('h2go_log',JSON.stringify(next)); setLogs(next); },[persist]);
 
-  // Request notification permission and set up reminders
+  const showToast = useCallback((msg)=>{
+    setToast(msg); setToastVis(true);
+    setTimeout(()=>setToastVis(false), 2600);
+  },[]);
+
+  // Trigger celebration overlay
+  const celebrate = useCallback(()=>{
+    setCelebDots(makeDots());
+    setCelebOut(false);
+    setCeleb(true);
+    setTimeout(()=>setCelebOut(true), 2800);
+    setTimeout(()=>setCeleb(false), 3500);
+  },[]);
+
+  // Reminders
   useEffect(()=>{
     clearInterval(timerRef.current);
     setNotifNote('');
     if(!remindOn) return;
 
-    const fireReminder = () => {
-      const dayTotal=(logs[todayKey()]||[]).reduce((s,e)=>s+e.ml,0);
-      if(dayTotal>=goal) return;
-      if(!isAllowedHour(wakeWd,wakeWe)) return;
-      if(typeof Notification !== 'undefined' && Notification.permission === 'granted'){
-        new Notification('H2Go', {body: randomReminder().replace('💧 ',''), icon:'icon-192.png'});
+    const fire = () => {
+      const dayTotal = (logs[todayKey()]||[]).reduce((s,e)=>s+e.ml,0);
+      if(dayTotal>=goal || !isAllowedHour(wakeWd,wakeWe)) return;
+      const msg = randMsg();
+      if(typeof Notification!=='undefined' && Notification.permission==='granted') {
+        new Notification('H2Go', { body: msg.replace('💧 ',''), icon:'icon-192.png' });
       } else {
-        showToast(randomReminder());
+        showToast(msg);
       }
     };
 
-    if(typeof Notification === 'undefined'){
-      setNotifNote('Tu navegador no soporta notificaciones. Los avisos aparecerán dentro de la app mientras esté abierta.');
-      timerRef.current = setInterval(fireReminder, remindInt*60*1000);
-    } else if(Notification.permission === 'granted'){
-      setNotifNote('✓ Notificaciones activadas');
-      timerRef.current = setInterval(fireReminder, remindInt*60*1000);
-    } else if(Notification.permission === 'denied'){
-      setNotifNote('Las notificaciones están bloqueadas en este dispositivo. Ve a Ajustes → Safari → Notificaciones para activarlas.');
+    if(typeof Notification==='undefined') {
+      setNotifNote('Los avisos aparecerán dentro de la app mientras esté abierta.');
+      timerRef.current = setInterval(fire, remindInt*60*1000);
+    } else if(Notification.permission==='granted') {
+      setNotifNote('✓ Notificaciones del sistema activadas');
+      timerRef.current = setInterval(fire, remindInt*60*1000);
+    } else if(Notification.permission==='denied') {
+      setNotifNote('Notificaciones bloqueadas. Los avisos se mostrarán dentro de la app.');
+      timerRef.current = setInterval(fire, remindInt*60*1000);
     } else {
       Notification.requestPermission().then(p=>{
-        if(p==='granted'){
-          setNotifNote('✓ Notificaciones activadas');
-          timerRef.current = setInterval(fireReminder, remindInt*60*1000);
-        } else {
-          setNotifNote('Permiso denegado. Los avisos se mostrarán dentro de la app mientras esté abierta.');
-          timerRef.current = setInterval(fireReminder, remindInt*60*1000);
-        }
+        if(p==='granted') setNotifNote('✓ Notificaciones del sistema activadas');
+        else setNotifNote('Los avisos aparecerán dentro de la app mientras esté abierta.');
+        timerRef.current = setInterval(fire, remindInt*60*1000);
       });
     }
     return ()=>clearInterval(timerRef.current);
   },[remindOn,remindInt,wakeWd,wakeWe,goal,logs,showToast]);
 
+  // Add drink
   const addDrink = useCallback((ml,idx)=>{
     const k=todayKey();
     const time=new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
@@ -195,85 +226,84 @@ function H2Go() {
     setFlash(idx); setTimeout(()=>setFlash(null),320);
     const total=next[k].reduce((s,e)=>s+e.ml,0);
     showToast(`+${ml} ml — Total: ${total} ml`);
-    if(total>=goal&&total-ml<goal){
-      setTimeout(()=>{
-        setCelebOut(false);
-        setCeleb(true);
-        setTimeout(()=>{ setCelebOut(true); setTimeout(()=>setCeleb(false),600); }, 3200);
-      }, 400);
-    }
-  },[logs,goal,saveLogs,showToast]);
+    if(total>=goal && total-ml<goal) setTimeout(celebrate, 500);
+  },[logs,goal,saveLogs,showToast,celebrate]);
 
-  const deleteEntry=useCallback((i)=>{
+  const deleteEntry = useCallback((i)=>{
     const k=todayKey(); const arr=[...(logs[k]||[])]; arr.splice(i,1);
     const next={...logs}; if(arr.length) next[k]=arr; else delete next[k]; saveLogs(next);
   },[logs,saveLogs]);
 
+  // Derived values
   const total    = (logs[todayKey()]||[]).reduce((s,e)=>s+e.ml,0);
   const pct      = Math.min(total/goal,1);
-  const offset   = CIRC-pct*CIRC;
+  const offset   = CIRC - pct*CIRC;
   const ringColor= pct>=1?'#3ab87a':'#4ba3e3';
   const totalLbl = total>=1000?(total/1000).toFixed(1).replace('.0','')+'L':String(total);
   const unitLbl  = total>=1000?'':' ml';
   const fmtMl    = v=>v>=1000?(v/1000).toFixed(1).replace('.0','')+'L':v?v+'ml':'—';
-  const calcStats= totals=>({
-    avg:   (f=>f.length?Math.round(f.reduce((a,b)=>a+b,0)/f.length):0)(totals.filter(v=>v>0)),
-    best:  Math.max(...totals,0),
-    daysOk:totals.filter(v=>v>=goal).length,
+  const calcStats= ts=>({
+    avg:   (f=>f.length?Math.round(f.reduce((a,b)=>a+b,0)/f.length):0)(ts.filter(v=>v>0)),
+    best:  Math.max(...ts,0),
+    daysOk:ts.filter(v=>v>=goal).length,
   });
-  const streak=(()=>{ let s=0; const d=new Date(); while(true){ const k=dateKey(d); if((logs[k]||[]).reduce((a,b)=>a+b.ml,0)>=goal){s++;d.setDate(d.getDate()-1);}else break; } return s; })();
+  const streak=(()=>{
+    let s=0; const d=new Date();
+    while(true){ const k=dateKey(d); if((logs[k]||[]).reduce((a,b)=>a+b.ml,0)>=goal){s++;d.setDate(d.getDate()-1);}else break; }
+    return s;
+  })();
+
   const C={bg:'#07111f',bg2:'#0d1e35',bg3:'#112240',accent:'#4ba3e3',accent2:'#7ec8f7',dim:'#2a4a6e',soft:'#6a9bc3',white:'#e8f4ff',green:'#3ab87a'};
 
+  // Bar chart
   const renderBars=(days,totals,maxBar,outerH,showNum)=>days.map((d,i)=>{
-    const k=dateKey(d); const val=totals[i];
+    const k=dateKey(d), val=totals[i];
     const barH=maxBar>0?Math.max((val/maxBar)*outerH,val>0?3:0):0;
-    const isToday=k===todayKey(); const met=val>=goal;
+    const isToday=k===todayKey(), met=val>=goal;
     return(
       <div key={k} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
         <span style={{fontSize:7,color:C.soft}}>{val>0?fmtMl(val):''}</span>
         <div style={{width:'100%',background:C.bg3,borderRadius:'4px 4px 2px 2px',display:'flex',alignItems:'flex-end',height:outerH}}>
           <div style={{width:'100%',height:barH,borderRadius:'4px 4px 2px 2px',
-            background:met?`linear-gradient(180deg,#7ef7c0,${C.green})`:isToday?`linear-gradient(180deg,${C.accent2},${C.accent})`:`linear-gradient(180deg,${C.dim},#1a3352)`,
+            background:met?'linear-gradient(180deg,#7ef7c0,#3ab87a)':isToday?`linear-gradient(180deg,${C.accent2},${C.accent})`:'linear-gradient(180deg,#2a4a6e,#1a3352)',
             boxShadow:met?'0 0 6px rgba(62,184,122,.3)':isToday?'0 0 8px rgba(75,163,227,.35)':'none',
             transition:'height .6s cubic-bezier(.4,0,.2,1)'}}/>
         </div>
-        <span style={{fontSize:9,color:isToday?C.accent2:C.soft,textTransform:'uppercase',letterSpacing:'.04em',lineHeight:1}}>
-          {showNum?d.getDate():DAYS[d.getDay()]}
-        </span>
+        <span style={{fontSize:9,color:isToday?C.accent2:C.soft,textTransform:'uppercase',letterSpacing:'.04em'}}>{showNum?d.getDate():DAYS[d.getDay()]}</span>
       </div>
     );
   });
 
-  const todayLogArr=[...(logs[todayKey()]||[])].reverse();
-  const selStyle={background:C.bg3,border:`1px solid ${C.dim}`,color:C.accent2,borderRadius:7,padding:'5px 8px',fontSize:12,fontFamily:'inherit'};
-  const rowStyle=(last)=>({display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:last?'none':`1px solid ${C.bg3}`,gap:10});
+  const todayLogArr = [...(logs[todayKey()]||[])].reverse();
+  const sel = {background:C.bg3,border:`1px solid ${C.dim}`,color:C.accent2,borderRadius:7,padding:'5px 8px',fontSize:12,fontFamily:'inherit'};
+  const row = (last)=>({display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 16px',borderBottom:last?'none':`1px solid ${C.bg3}`,gap:10});
 
-  return(
+  return (
     <div style={{background:C.bg,height:'100dvh',display:'flex',flexDirection:'column',fontFamily:"'Helvetica Neue',Arial,sans-serif",fontWeight:300,color:'#cce7ff',overflow:'hidden',position:'relative'}}>
+
+      {/* Grid background */}
       <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(75,163,227,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(75,163,227,.04) 1px,transparent 1px)',backgroundSize:'40px 40px',pointerEvents:'none',zIndex:0}}/>
 
+      {/* ── TABS ── */}
       <nav style={{display:'flex',borderBottom:`1px solid ${C.dim}`,background:C.bg,zIndex:10,flexShrink:0,paddingTop:'env(safe-area-inset-top,0px)'}}>
         {[['today','Hoy'],['history','Historial'],['settings','Ajustes']].map(([id,lbl])=>(
-          <div key={id} onClick={()=>setTab(id)}
-            style={{flex:1,padding:'13px 0 11px',textAlign:'center',fontSize:10,letterSpacing:'.13em',textTransform:'uppercase',
-              color:tab===id?C.accent2:C.soft,cursor:'pointer',
-              borderBottom:tab===id?`2px solid ${C.accent2}`:'2px solid transparent',marginBottom:-1,userSelect:'none'}}>
-            {lbl}
-          </div>
+          <div key={id} onClick={()=>setTab(id)} style={{flex:1,padding:'13px 0 11px',textAlign:'center',fontSize:10,letterSpacing:'.13em',textTransform:'uppercase',color:tab===id?C.accent2:C.soft,cursor:'pointer',borderBottom:tab===id?`2px solid ${C.accent2}`:'2px solid transparent',marginBottom:-1,userSelect:'none'}}>{lbl}</div>
         ))}
       </nav>
 
-      {/* HOY */}
-      {tab==='today'&&(
+      {/* ── HOY ── */}
+      {tab==='today' && (
         <div style={{display:'flex',flexDirection:'column',flex:1,overflowY:'auto',zIndex:1,paddingBottom:'env(safe-area-inset-bottom,0px)'}}>
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'0 20px 28px'}}>
+
             <div style={{marginTop:22,marginBottom:2,lineHeight:1,textAlign:'center'}}>
-              <span style={{fontFamily:"Georgia,serif",fontSize:32,color:C.white,letterSpacing:'-.02em'}}>H2</span>
-              <span style={{fontFamily:"Georgia,serif",fontSize:32,color:C.accent2,fontStyle:'italic',letterSpacing:'-.01em'}}>Go!</span>
+              <span style={{fontFamily:'Georgia,serif',fontSize:32,color:C.white,letterSpacing:'-.02em'}}>H2</span>
+              <span style={{fontFamily:'Georgia,serif',fontSize:32,color:C.accent2,fontStyle:'italic',letterSpacing:'-.01em'}}>Go!</span>
             </div>
             <div style={{fontSize:9,letterSpacing:'.25em',textTransform:'uppercase',color:C.soft,marginBottom:10}}>· hidratación diaria ·</div>
             <div style={{fontSize:11,color:C.soft,letterSpacing:'.12em',textTransform:'uppercase',marginBottom:10}}>{fmtDate(new Date())}</div>
 
+            {/* Progress ring */}
             <div style={{position:'relative',width:186,height:186,margin:'6px auto 4px',flexShrink:0}}>
               <svg width="186" height="186" viewBox="0 0 186 186" style={{transform:'rotate(-90deg)'}}>
                 <circle cx="93" cy="93" r="80" fill="none" stroke={C.dim} strokeWidth="9"/>
@@ -282,8 +312,8 @@ function H2Go() {
                   style={{filter:'drop-shadow(0 0 5px rgba(75,163,227,.45))',transition:'stroke-dashoffset .6s cubic-bezier(.4,0,.2,1),stroke .4s'}}/>
               </svg>
               <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
-                <span style={{fontFamily:"Georgia,serif",fontSize:36,color:C.white,lineHeight:1,letterSpacing:'-.03em'}}>{totalLbl}</span>
-                {unitLbl&&<span style={{fontSize:10,color:C.soft,letterSpacing:'.1em',textTransform:'uppercase',marginTop:2}}>{unitLbl}</span>}
+                <span style={{fontFamily:'Georgia,serif',fontSize:36,color:C.white,lineHeight:1,letterSpacing:'-.03em'}}>{totalLbl}</span>
+                {unitLbl && <span style={{fontSize:10,color:C.soft,letterSpacing:'.1em',textTransform:'uppercase',marginTop:2}}>{unitLbl}</span>}
                 <span style={{fontSize:10,color:C.dim,marginTop:3}}>/ {goal} ml</span>
               </div>
             </div>
@@ -292,30 +322,28 @@ function H2Go() {
               {Math.round(pct*100)}% del objetivo
             </div>
 
+            {/* Drink buttons */}
             <div style={{display:'flex',gap:10,width:'100%',justifyContent:'center',marginBottom:20}}>
-              {vessels.map(({ml,label,Comp,w,h},i)=>(
-                <button key={ml} onClick={()=>addDrink(ml,i)}
-                  style={{flex:1,maxWidth:100,display:'flex',flexDirection:'column',alignItems:'center',gap:8,
-                    background:flash===i?C.bg3:C.bg2,border:`1px solid ${flash===i?C.accent:C.dim}`,
-                    borderRadius:16,padding:'14px 8px 12px',cursor:'pointer',outline:'none',
-                    transform:flash===i?'scale(.92)':'scale(1)',transition:'background .15s,transform .12s,border-color .15s'}}>
+              {VESSELS.map(({ml,label,Comp,w,h},i)=>(
+                <button key={ml} onClick={()=>addDrink(ml,i)} style={{flex:1,maxWidth:100,display:'flex',flexDirection:'column',alignItems:'center',gap:8,background:flash===i?C.bg3:C.bg2,border:`1px solid ${flash===i?C.accent:C.dim}`,borderRadius:16,padding:'14px 8px 12px',cursor:'pointer',outline:'none',transform:flash===i?'scale(.92)':'scale(1)',transition:'background .15s,transform .12s,border-color .15s'}}>
                   <div style={{width:w,height:h,flexShrink:0}}><Comp/></div>
-                  <span style={{fontFamily:"Georgia,serif",fontSize:15,color:C.accent2,lineHeight:1}}>{ml}</span>
+                  <span style={{fontFamily:'Georgia,serif',fontSize:15,color:C.accent2,lineHeight:1}}>{ml}</span>
                   <span style={{fontSize:9,color:C.soft,letterSpacing:'.08em',textTransform:'uppercase',marginTop:-3}}>{label}</span>
                 </button>
               ))}
             </div>
 
+            {/* Log */}
             <div style={{fontSize:9,letterSpacing:'.2em',textTransform:'uppercase',color:C.soft,marginBottom:8,alignSelf:'flex-start'}}>Registro de hoy</div>
             <div style={{width:'100%',display:'flex',flexDirection:'column',gap:5}}>
               {todayLogArr.length===0
-                ?<div style={{fontSize:12,color:C.dim,textAlign:'center',padding:'10px 0'}}>Aún no has registrado nada hoy.</div>
-                :todayLogArr.map((e,ri)=>{
+                ? <div style={{fontSize:12,color:C.dim,textAlign:'center',padding:'10px 0'}}>Aún no has registrado nada hoy.</div>
+                : todayLogArr.map((e,ri)=>{
                     const realIdx=(logs[todayKey()]||[]).length-1-ri;
                     return(
                       <div key={ri} style={{display:'flex',alignItems:'center',background:C.bg2,border:`1px solid ${C.bg3}`,borderRadius:10,padding:'9px 12px'}}>
                         <span style={{fontSize:11,color:C.soft,minWidth:40}}>{e.time}</span>
-                        <span style={{fontFamily:"Georgia,serif",fontSize:14,color:C.accent2,flex:1,textAlign:'right',marginRight:8}}>+{e.ml} ml</span>
+                        <span style={{fontFamily:'Georgia,serif',fontSize:14,color:C.accent2,flex:1,textAlign:'right',marginRight:8}}>+{e.ml} ml</span>
                         <button style={{background:'none',border:'none',color:C.dim,fontSize:13,cursor:'pointer',padding:0}} onClick={()=>deleteEntry(realIdx)}>✕</button>
                       </div>
                     );
@@ -326,42 +354,36 @@ function H2Go() {
         </div>
       )}
 
-      {/* HISTORIAL */}
-      {tab==='history'&&(
+      {/* ── HISTORIAL ── */}
+      {tab==='history' && (
         <div style={{display:'flex',flexDirection:'column',flex:1,overflowY:'auto',zIndex:1,paddingBottom:'env(safe-area-inset-bottom,0px)'}}>
           <div style={{padding:'20px 18px',display:'flex',flexDirection:'column',gap:18}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <div style={{fontFamily:"Georgia,serif",fontSize:24,color:C.white}}>Historial</div>
+              <div style={{fontFamily:'Georgia,serif',fontSize:24,color:C.white}}>Historial</div>
               <div style={{display:'flex',background:C.bg3,borderRadius:20,padding:2}}>
                 {[['week','Semana'],['month','Mes']].map(([m,l])=>(
-                  <button key={m} onClick={()=>setHistMode(m)}
-                    style={{fontSize:10,letterSpacing:'.1em',textTransform:'uppercase',padding:'5px 12px',borderRadius:16,border:'none',cursor:'pointer',background:histMode===m?C.accent2:'transparent',color:histMode===m?C.bg:C.soft,fontFamily:'inherit'}}>
-                    {l}
-                  </button>
+                  <button key={m} onClick={()=>setHistMode(m)} style={{fontSize:10,letterSpacing:'.1em',textTransform:'uppercase',padding:'5px 12px',borderRadius:16,border:'none',cursor:'pointer',background:histMode===m?C.accent2:'transparent',color:histMode===m?C.bg:C.soft,fontFamily:'inherit'}}>{l}</button>
                 ))}
               </div>
             </div>
 
-            {histMode==='week'&&(()=>{
-              const wd=getWeekDays(); const wt=wd.map(d=>(logs[dateKey(d)]||[]).reduce((s,e)=>s+e.ml,0));
-              const mx=Math.max(goal,...wt,1); const {avg,best,daysOk}=calcStats(wt);
-              const mon=wd[0],sun=wd[6];
-              return(<React.Fragment>
+            {histMode==='week' && (()=>{
+              const wd=getWeekDays(), wt=wd.map(d=>(logs[dateKey(d)]||[]).reduce((s,e)=>s+e.ml,0));
+              const mx=Math.max(goal,...wt,1), {avg,best,daysOk}=calcStats(wt);
+              const mon=wd[0], sun=wd[6];
+              return (<React.Fragment>
                 <div style={{textAlign:'center',fontSize:12,color:C.accent2}}>{mon.getDate()} – {sun.getDate()} de {MONTHS[sun.getMonth()]}</div>
                 <div style={{background:C.bg2,border:`1px solid ${C.dim}`,borderRadius:18,padding:'16px 10px 10px'}}>
                   <div style={{display:'flex',alignItems:'flex-end',gap:4,height:150}}>{renderBars(wd,wt,mx,110,false)}</div>
                   <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10,paddingTop:8,borderTop:`1px solid ${C.bg3}`}}>
-                    <div style={{width:7,height:7,borderRadius:'50%',background:C.green,flexShrink:0}}/>
-                    <span style={{fontSize:9,color:C.soft}}>Objetivo: {goal} ml</span>
+                    <div style={{width:7,height:7,borderRadius:'50%',background:C.green,flexShrink:0}}/><span style={{fontSize:9,color:C.soft}}>Objetivo: {goal} ml</span>
                   </div>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  {[['Media diaria',fmtMl(avg),'esta semana'],['Mejor día',fmtMl(best),'esta semana'],
-                    ['Racha',streak+' días','objetivo seguido'],['Días objetivo',`${daysOk}/7`,'esta semana']
-                  ].map(([lbl,val,sub])=>(
+                  {[['Media diaria',fmtMl(avg),'esta semana'],['Mejor día',fmtMl(best),'esta semana'],['Racha',streak+' días','objetivo seguido'],['Días objetivo',`${daysOk}/7`,'esta semana']].map(([lbl,val,sub])=>(
                     <div key={lbl} style={{background:C.bg2,border:`1px solid ${C.dim}`,borderRadius:14,padding:14}}>
                       <div style={{fontSize:8,letterSpacing:'.15em',textTransform:'uppercase',color:C.soft,marginBottom:5}}>{lbl}</div>
-                      <div style={{fontFamily:"Georgia,serif",fontSize:22,color:C.white,lineHeight:1}}>{val}</div>
+                      <div style={{fontFamily:'Georgia,serif',fontSize:22,color:C.white,lineHeight:1}}>{val}</div>
                       <div style={{fontSize:9,color:C.soft,marginTop:3}}>{sub}</div>
                     </div>
                   ))}
@@ -369,35 +391,28 @@ function H2Go() {
               </React.Fragment>);
             })()}
 
-            {histMode==='month'&&(()=>{
+            {histMode==='month' && (()=>{
               const prevM=()=>setMonthRef(r=>{const d=new Date(r.y,r.m-1,1);return{y:d.getFullYear(),m:d.getMonth()};});
               const nextM=()=>setMonthRef(r=>{const now=new Date();if(r.y===now.getFullYear()&&r.m===now.getMonth())return r;const d=new Date(r.y,r.m+1,1);return{y:d.getFullYear(),m:d.getMonth()};});
-              const mdays=getMonthDays(monthRef.y,monthRef.m);
-              const mt=mdays.map(d=>(logs[dateKey(d)]||[]).reduce((s,e)=>s+e.ml,0));
-              const mx=Math.max(goal,...mt,1); const {avg,best,daysOk}=calcStats(mt);
-              const totalMo=mt.reduce((a,b)=>a+b,0);
-              return(<React.Fragment>
+              const mdays=getMonthDays(monthRef.y,monthRef.m), mt=mdays.map(d=>(logs[dateKey(d)]||[]).reduce((s,e)=>s+e.ml,0));
+              const mx=Math.max(goal,...mt,1), {avg,best,daysOk}=calcStats(mt), totalMo=mt.reduce((a,b)=>a+b,0);
+              return (<React.Fragment>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
                   <button onClick={prevM} style={{background:'none',border:`1px solid ${C.dim}`,borderRadius:8,color:C.soft,fontSize:16,cursor:'pointer',padding:'4px 12px',lineHeight:1}}>‹</button>
-                  <span style={{fontFamily:"Georgia,serif",fontSize:14,color:C.accent2,flex:1,textAlign:'center'}}>{MONTHS[monthRef.m]} {monthRef.y}</span>
+                  <span style={{fontFamily:'Georgia,serif',fontSize:14,color:C.accent2,flex:1,textAlign:'center'}}>{MONTHS[monthRef.m]} {monthRef.y}</span>
                   <button onClick={nextM} style={{background:'none',border:`1px solid ${C.dim}`,borderRadius:8,color:C.soft,fontSize:16,cursor:'pointer',padding:'4px 12px',lineHeight:1}}>›</button>
                 </div>
                 <div style={{background:C.bg2,border:`1px solid ${C.dim}`,borderRadius:18,padding:'16px 6px 10px'}}>
                   <div style={{display:'flex',alignItems:'flex-end',gap:2,height:130}}>{renderBars(mdays,mt,mx,100,true)}</div>
                   <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10,paddingTop:8,borderTop:`1px solid ${C.bg3}`}}>
-                    <div style={{width:7,height:7,borderRadius:'50%',background:C.green,flexShrink:0}}/>
-                    <span style={{fontSize:9,color:C.soft}}>Objetivo: {goal} ml/día</span>
+                    <div style={{width:7,height:7,borderRadius:'50%',background:C.green,flexShrink:0}}/><span style={{fontSize:9,color:C.soft}}>Objetivo: {goal} ml/día</span>
                   </div>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  {[['Total del mes',fmtMl(totalMo),MONTHS_SHORT[monthRef.m]+' '+monthRef.y],
-                    ['Media diaria',fmtMl(avg),'por día registrado'],
-                    ['Mejor día',fmtMl(best),'del mes'],
-                    ['Días objetivo',`${daysOk}/${mdays.length}`,'conseguidos']
-                  ].map(([lbl,val,sub])=>(
+                  {[['Total del mes',fmtMl(totalMo),MS[monthRef.m]+' '+monthRef.y],['Media diaria',fmtMl(avg),'por día registrado'],['Mejor día',fmtMl(best),'del mes'],['Días objetivo',`${daysOk}/${mdays.length}`,'conseguidos']].map(([lbl,val,sub])=>(
                     <div key={lbl} style={{background:C.bg2,border:`1px solid ${C.dim}`,borderRadius:14,padding:14}}>
                       <div style={{fontSize:8,letterSpacing:'.15em',textTransform:'uppercase',color:C.soft,marginBottom:5}}>{lbl}</div>
-                      <div style={{fontFamily:"Georgia,serif",fontSize:22,color:C.white,lineHeight:1}}>{val}</div>
+                      <div style={{fontFamily:'Georgia,serif',fontSize:22,color:C.white,lineHeight:1}}>{val}</div>
                       <div style={{fontSize:9,color:C.soft,marginTop:3}}>{sub}</div>
                     </div>
                   ))}
@@ -408,86 +423,69 @@ function H2Go() {
         </div>
       )}
 
-      {/* AJUSTES */}
-      {tab==='settings'&&(
+      {/* ── AJUSTES ── */}
+      {tab==='settings' && (
         <div style={{display:'flex',flexDirection:'column',flex:1,overflowY:'auto',zIndex:1,paddingBottom:'env(safe-area-inset-bottom,0px)'}}>
           <div style={{padding:'20px 18px',display:'flex',flexDirection:'column',gap:18}}>
-            <div style={{fontFamily:"Georgia,serif",fontSize:24,color:C.white}}>Ajustes</div>
+            <div style={{fontFamily:'Georgia,serif',fontSize:24,color:C.white}}>Ajustes</div>
 
             <div style={{background:C.bg2,border:`1px solid ${C.dim}`,borderRadius:16,overflow:'hidden'}}>
-              <div style={rowStyle(true)}>
-                <div style={{flex:1}}>
-                  <strong style={{display:'block',fontSize:13,color:C.white,marginBottom:2,fontWeight:400}}>Objetivo diario</strong>
-                  <span style={{fontSize:10,color:C.soft}}>Mililitros recomendados</span>
-                </div>
+              <div style={row(true)}>
+                <div style={{flex:1}}><strong style={{display:'block',fontSize:13,color:C.white,marginBottom:2,fontWeight:400}}>Objetivo diario</strong><span style={{fontSize:10,color:C.soft}}>Mililitros recomendados</span></div>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
-                  <input type="range" min="1000" max="4000" step="250" value={goal}
-                    onChange={e=>{const v=parseInt(e.target.value);setGoal(v);persist('h2go_goal',v);}}
-                    style={{width:80,accentColor:C.accent}}/>
-                  <span style={{fontFamily:"Georgia,serif",fontSize:14,color:C.accent2,minWidth:56,textAlign:'right'}}>{goal} ml</span>
+                  <input type="range" min="1000" max="4000" step="250" value={goal} onChange={e=>{const v=parseInt(e.target.value);setGoal(v);persist('h2go_goal',v);}} style={{width:80,accentColor:C.accent}}/>
+                  <span style={{fontFamily:'Georgia,serif',fontSize:14,color:C.accent2,minWidth:56,textAlign:'right'}}>{goal} ml</span>
                 </div>
               </div>
             </div>
 
             <div style={{background:C.bg2,border:`1px solid ${C.dim}`,borderRadius:16,overflow:'hidden'}}>
-              <div style={rowStyle(!remindOn)}>
-                <div style={{flex:1}}>
-                  <strong style={{display:'block',fontSize:13,color:C.white,marginBottom:2,fontWeight:400}}>Recordatorios</strong>
-                  <span style={{fontSize:10,color:C.soft}}>Avisos para beber agua</span>
-                </div>
-                <input type="checkbox" checked={remindOn}
-                  onChange={e=>{setRemindOn(e.target.checked);persist('h2go_remind',e.target.checked?'1':'0');}}
-                  style={{width:18,height:18,accentColor:C.accent}}/>
+              <div style={row(!remindOn)}>
+                <div style={{flex:1}}><strong style={{display:'block',fontSize:13,color:C.white,marginBottom:2,fontWeight:400}}>Recordatorios</strong><span style={{fontSize:10,color:C.soft}}>Avisos para beber agua</span></div>
+                <input type="checkbox" checked={remindOn} onChange={e=>{setRemindOn(e.target.checked);persist('h2go_remind',e.target.checked?'1':'0');}} style={{width:18,height:18,accentColor:C.accent}}/>
               </div>
-              {remindOn&&(<React.Fragment>
-                <div style={rowStyle(false)}>
+              {remindOn && (<React.Fragment>
+                <div style={row(false)}>
                   <div style={{flex:1}}><strong style={{display:'block',fontSize:13,color:C.white,marginBottom:2,fontWeight:400}}>Cada cuánto</strong><span style={{fontSize:10,color:C.soft}}>Intervalo entre avisos</span></div>
-                  <select value={remindInt} style={selStyle} onChange={e=>{setRemindInt(parseInt(e.target.value));persist('h2go_interval',e.target.value);}}>
-                    <option value="30">30 min</option><option value="60">1 hora</option>
-                    <option value="90">1h 30min</option><option value="120">2 horas</option>
+                  <select value={remindInt} style={sel} onChange={e=>{setRemindInt(parseInt(e.target.value));persist('h2go_interval',e.target.value);}}>
+                    <option value="30">30 min</option><option value="60">1 hora</option><option value="90">1h 30min</option><option value="120">2 horas</option>
                   </select>
                 </div>
-                <div style={rowStyle(false)}>
+                <div style={row(false)}>
                   <div style={{flex:1}}><strong style={{display:'block',fontSize:13,color:C.white,marginBottom:2,fontWeight:400}}>Despertar L–V</strong><span style={{fontSize:10,color:C.soft}}>Primer aviso entre semana</span></div>
-                  <select value={wakeWd} style={selStyle} onChange={e=>{setWakeWd(parseInt(e.target.value));persist('h2go_wakewd',e.target.value);}}>
+                  <select value={wakeWd} style={sel} onChange={e=>{setWakeWd(parseInt(e.target.value));persist('h2go_wakewd',e.target.value);}}>
                     {[6,7,8,9,10,11].map(h=><option key={h} value={h}>{h}:00</option>)}
                   </select>
                 </div>
-                <div style={rowStyle(true)}>
+                <div style={row(true)}>
                   <div style={{flex:1}}><strong style={{display:'block',fontSize:13,color:C.white,marginBottom:2,fontWeight:400}}>Despertar Sáb–Dom</strong><span style={{fontSize:10,color:C.soft}}>Primer aviso en fin de semana</span></div>
-                  <select value={wakeWe} style={selStyle} onChange={e=>{setWakeWe(parseInt(e.target.value));persist('h2go_wakewe',e.target.value);}}>
+                  <select value={wakeWe} style={sel} onChange={e=>{setWakeWe(parseInt(e.target.value));persist('h2go_wakewe',e.target.value);}}>
                     {[8,9,10,11,12,13].map(h=><option key={h} value={h}>{h}:00</option>)}
                   </select>
                 </div>
               </React.Fragment>)}
             </div>
 
-            {remindOn&&(
+            {remindOn && (
               <div style={{fontSize:10,color:C.soft,lineHeight:1.7,background:C.bg2,border:`1px solid ${C.bg3}`,borderRadius:12,padding:'11px 14px'}}>
-                Los recordatorios se silencian entre las <strong style={{color:C.accent2}}>22:00</strong> y tu hora de despertar, y también en cuanto <strong style={{color:C.accent2}}>alcanzas el objetivo del día</strong>.
+                Avisos silenciados entre las <strong style={{color:C.accent2}}>22:00</strong> y tu hora de despertar, y cuando <strong style={{color:C.accent2}}>alcanzas el objetivo</strong>.
               </div>
             )}
-            {remindOn&&notifNote&&(
-              <div style={{fontSize:10,lineHeight:1.6,background:C.bg2,border:`1px solid ${notifNote.startsWith('✓')?'#2a5a3a':'#4a3a20'}`,borderRadius:12,padding:'11px 14px',
-                color:notifNote.startsWith('✓')?C.green:'#c8a84a'}}>
+            {remindOn && notifNote && (
+              <div style={{fontSize:10,lineHeight:1.6,background:C.bg2,border:`1px solid ${notifNote.startsWith('✓')?'#2a5a3a':'#4a3a20'}`,borderRadius:12,padding:'11px 14px',color:notifNote.startsWith('✓')?C.green:'#c8a84a'}}>
                 {notifNote}
               </div>
             )}
 
-            <button onClick={()=>{ if(window.confirm('¿Reiniciar los datos de hoy?')){ const next={...logs}; delete next[todayKey()]; saveLogs(next); showToast('Datos de hoy reiniciados'); } }}
-              style={{width:'100%',background:'none',border:'1px solid #4a2020',borderRadius:12,color:'#c07070',padding:13,fontSize:12,letterSpacing:'.08em',cursor:'pointer',fontFamily:'inherit'}}>
+            <button onClick={()=>{ if(window.confirm('¿Reiniciar los datos de hoy?')){ const next={...logs}; delete next[todayKey()]; saveLogs(next); showToast('Datos de hoy reiniciados'); } }} style={{width:'100%',background:'none',border:'1px solid #4a2020',borderRadius:12,color:'#c07070',padding:13,fontSize:12,letterSpacing:'.08em',cursor:'pointer',fontFamily:'inherit'}}>
               Reiniciar datos de hoy
             </button>
 
             <div style={{marginTop:4,textAlign:'center',paddingBottom:8}}>
               <div style={{fontSize:9,color:C.dim,letterSpacing:'.14em',textTransform:'uppercase',marginBottom:5}}>Desarrollado por</div>
               <div style={{fontSize:12,color:C.soft,letterSpacing:'.06em',marginBottom:6}}>@mellamanjuanjo</div>
-              <a href="mailto:juanjolopezortego@me.com" title="Escribir un correo"
-                style={{fontSize:10,color:C.dim,textDecoration:'none',letterSpacing:'.04em',
-                  borderBottom:'1px dotted #2a4a6e',paddingBottom:1,
-                  filter:'blur(3px)',transition:'filter .25s',cursor:'pointer',display:'inline-block'}}
-                onMouseEnter={e=>e.currentTarget.style.filter='blur(0)'}
-                onMouseLeave={e=>e.currentTarget.style.filter='blur(3px)'}
+              <a href="mailto:juanjolopezortego@me.com" title="Escribir un correo" style={{fontSize:10,color:C.dim,textDecoration:'none',letterSpacing:'.04em',borderBottom:'1px dotted #2a4a6e',paddingBottom:1,filter:'blur(3px)',transition:'filter .25s',cursor:'pointer',display:'inline-block'}}
+                onMouseEnter={e=>e.currentTarget.style.filter='blur(0)'} onMouseLeave={e=>e.currentTarget.style.filter='blur(3px)'}
                 onTouchStart={e=>{ e.currentTarget.style.filter='blur(0)'; setTimeout(()=>{ try{e.currentTarget.style.filter='blur(3px)'}catch(x){} },3500); }}>
                 juanjolopezortego@me.com
               </a>
@@ -497,49 +495,46 @@ function H2Go() {
         </div>
       )}
 
-      {/* CELEBRACIÓN — objetivo alcanzado */}
-      {celeb&&(
+      {/* ── CELEBRATION OVERLAY ── */}
+      {celeb && (
         <div style={{position:'fixed',inset:0,zIndex:300,pointerEvents:'none'}}>
-          {/* Gotas explosivas */}
-          {Array.from({length:18},(_,i)=>{
-            const angle=(i/18)*360; const dist=80+Math.random()*60;
-            const tx=Math.cos(angle*Math.PI/180)*dist; const ty=Math.sin(angle*Math.PI/180)*dist;
-            const size=6+Math.random()*10; const delay=Math.random()*0.3;
-            const colors=['#4ba3e3','#7ec8f7','#b8e0ff','#3ab87a','#c5e8fc'];
-            return(<div key={i} style={{position:'absolute',left:'50%',top:'50%',
-              width:size,height:size*1.3,borderRadius:'50% 50% 50% 50% / 60% 60% 40% 40%',
-              background:colors[i%colors.length],
-              '--tx':tx+'px','--ty':ty+'px',
-              animation:`dropletFly 1s ${delay}s cubic-bezier(.2,0,.8,1) forwards`}}/>);
-          })}
-          {/* Anillo expansivo */}
-          <div style={{position:'absolute',left:'50%',top:'50%',width:160,height:160,borderRadius:'50%',
-            border:'3px solid #7ec8f7',transform:'translate(-50%,-50%)',
-            animation:'dropBurst 1s ease-out forwards',opacity:0.6}}/>
-          {/* Tarjeta central */}
-          <div style={{position:'absolute',left:'50%',top:'50%',
-            animation:celebOut?'celebFadeOut .6s ease forwards':'celebFadeIn .5s ease forwards',
+          {/* Expanding ring */}
+          <div style={{position:'absolute',left:'50%',top:'50%',width:180,height:180,borderRadius:'50%',border:'2px solid #7ec8f7',animation:'ringPop 1s ease-out forwards'}}/>
+          {/* Flying droplets — pre-computed, no Math.random in render */}
+          {celebDots.map((dot,i)=>(
+            <div key={i} style={{
+              position:'absolute', left:'50%', top:'50%',
+              width:dot.s, height:Math.round(dot.s*1.3),
+              borderRadius:'50% 50% 50% 50% / 60% 60% 40% 40%',
+              background:dot.col,
+              marginLeft:-dot.s/2, marginTop:-dot.s/2,
+              animation:`flyDrop 1s ${dot.delay}s cubic-bezier(.2,0,.8,1) forwards`,
+              '--fly':`translate(${dot.tx}px,${dot.ty}px)`,
+            }}/>
+          ))}
+          {/* Card */}
+          <div style={{
+            position:'absolute', left:'50%', top:'50%',
+            animation: celebOut ? 'cardOut .6s ease forwards' : 'cardIn .5s ease forwards',
             background:'linear-gradient(135deg,#0d1e35,#112240)',
-            border:'1px solid #4ba3e3',borderRadius:28,padding:'32px 40px',textAlign:'center',
-            boxShadow:'0 0 60px rgba(75,163,227,.3), 0 20px 60px rgba(0,0,0,.5)'}}>
-            {/* Gota SVG grande */}
-            <svg width="64" height="80" viewBox="0 0 64 80" style={{margin:'0 auto 16px',display:'block',filter:'drop-shadow(0 0 12px rgba(75,163,227,.6))'}}>
+            border:'1px solid #4ba3e3', borderRadius:28, padding:'30px 38px', textAlign:'center',
+            boxShadow:'0 0 50px rgba(75,163,227,.35), 0 20px 60px rgba(0,0,0,.6)',
+            minWidth:220,
+          }}>
+            <svg width="56" height="70" viewBox="0 0 64 80" style={{margin:'0 auto 14px',display:'block',filter:'drop-shadow(0 0 10px rgba(75,163,227,.6))'}}>
               <path d="M32 4C32 4 6 36 6 52a26 26 0 0 0 52 0C58 36 32 4 32 4z" fill="#4ba3e3"/>
               <path d="M32 4C32 4 8 34 7 50" stroke="#b8e0ff" strokeWidth="3" strokeLinecap="round" fill="none" opacity=".5"/>
-              <ellipse cx="22" cy="46" rx="6" ry="10" fill="white" opacity=".2" transform="rotate(-20 22 46)"/>
+              <ellipse cx="22" cy="46" rx="6" ry="10" fill="white" opacity=".25" transform="rotate(-20 22 46)"/>
             </svg>
-            <div style={{fontFamily:"Georgia,serif",fontSize:22,color:'#e8f4ff',letterSpacing:'-.01em',marginBottom:6}}>
-              ¡Reto conseguido!
-            </div>
-            <div style={{fontSize:12,color:'#7ec8f7',letterSpacing:'.1em',textTransform:'uppercase'}}>
-              Objetivo del día cumplido
-            </div>
-            <div style={{fontSize:28,marginTop:14}}>💧</div>
+            <div style={{fontFamily:'Georgia,serif',fontSize:22,color:'#e8f4ff',letterSpacing:'-.01em',marginBottom:6}}>¡Reto conseguido!</div>
+            <div style={{fontSize:11,color:'#7ec8f7',letterSpacing:'.12em',textTransform:'uppercase'}}>Objetivo del día cumplido</div>
+            <div style={{fontSize:26,marginTop:12}}>💧✨</div>
           </div>
         </div>
       )}
 
-      <div style={{position:'fixed',bottom:20,left:'50%',transform:`translateX(-50%) translateY(${toastVis?0:80}px)`,background:'#4ba3e3',color:'#07111f',fontSize:12,fontWeight:500,letterSpacing:'.06em',padding:'9px 18px',borderRadius:20,zIndex:200,opacity:toastVis?1:0,transition:'transform .3s,opacity .3s',whiteSpace:'nowrap',pointerEvents:'none'}}>
+      {/* Toast */}
+      <div style={{position:'fixed',bottom:20,left:'50%',transform:`translateX(-50%) translateY(${toastVis?0:80}px)`,background:C.accent,color:C.bg,fontSize:12,fontWeight:500,letterSpacing:'.06em',padding:'9px 18px',borderRadius:20,zIndex:200,opacity:toastVis?1:0,transition:'transform .3s,opacity .3s',whiteSpace:'nowrap',pointerEvents:'none'}}>
         {toast}
       </div>
     </div>
